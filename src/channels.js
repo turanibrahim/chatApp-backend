@@ -4,58 +4,76 @@ module.exports = function(app) {
     return;
   }
 
+  const setOnlineStatus = async (props) => {
+    const {connection, isOnline} = props;
+
+    const id = connection.user._id;
+    const data = {
+      isOnline,
+    };
+
+    const userService = app.service('users');
+
+    userService.patch(id, data).then(result => {
+      const { name, surname } = result;
+
+      if(isOnline) {
+        console.log(`${name} ${surname} online!`);
+      } else {
+        console.log(`${name} ${surname} disconnected!`);
+      }
+    }).catch((...error) => console.log(error));
+  };
+
+
   app.on('connection', connection => {
     // On a new real-time connection, add it to the anonymous channel
     app.channel('anonymous').join(connection);
   });
 
-  app.on('login', (authResult, { connection }) => {
-    // connection can be undefined if there is no
-    // real-time connection, e.g. when logging in via REST
+  app.on('disconnect', connection => {
     if(connection) {
-      // Obtain the logged in user from the connection
-      // const user = connection.user;
-      
-      // The connection is no longer anonymous, remove it
-      app.channel('anonymous').leave(connection);
-
-      // Add it to the authenticated user channel
-      app.channel('authenticated').join(connection);
-
-      // Channels can be named anything and joined on any condition 
-      
-      // E.g. to send real-time events only to admins use
-      // if(user.isAdmin) { app.channel('admins').join(connection); }
-
-      // If the user has joined e.g. chat rooms
-      // if(Array.isArray(user.rooms)) user.rooms.forEach(room => app.channel(`rooms/${room.id}`).join(connection));
-      
-      // Easily organize users by email and userid for things like messaging
-      // app.channel(`emails/${user.email}`).join(connection);
-      // app.channel(`userIds/${user.id}`).join(connection);
+      setOnlineStatus({connection, isOnline: false});
     }
   });
 
-  // eslint-disable-next-line no-unused-vars
-  app.publish((data, hook) => {
-    // Here you can add event publishers to channels set up in `channels.js`
-    // To publish only for a specific event use `app.publish(eventname, () => {})`
 
-    console.log('Publishing all events to all authenticated users. See `channels.js` and https://docs.feathersjs.com/api/channels.html for more information.'); // eslint-disable-line
-
-    // e.g. to publish all service events to all authenticated users use
-    return app.channel('authenticated');
+  app.on('login', async (authResult, { connection }) => {
+    if(connection) {
+      if(connection) {
+        await setOnlineStatus({connection, isOnline: true});
+        app.channel('anonymous').leave(connection);
+        app.channel(`userId/${connection.user._id}`).join(connection);
+        app.channel(`users/${connection.user._id}`).join(connection);
+      }
+    }
   });
 
-  // Here you can also add service specific event publishers
-  // e.g. the publish the `users` service `created` event to the `admins` channel
-  // app.service('users').publish('created', () => app.channel('admins'));
-  
-  // With the userid and email organization from above you can easily select involved users
-  // app.service('messages').publish(() => {
-  //   return [
-  //     app.channel(`userIds/${data.createdBy}`),
-  //     app.channel(`emails/${data.recipientEmail}`)
-  //   ];
-  // });
+  app.on('logout', async (authResult) => {
+    if(authResult) {
+      await setOnlineStatus({connection: authResult, isOnline: false});
+    }
+  });
+
+  app.service('users').publish('patched',(data) => {
+    return app.channel(`users/${data._id}`);
+  });
+
+  /*app.service('messages').publish(async (data, context) => {
+    const conversation = await context.app.service('conversations').get(data.conversation_id);
+
+    const channels = conversation.users.map(user => {
+      return app.channel(`userId/${user._id}`);
+    });
+
+    return channels;
+  });*/
+
+  /*app.service('conversations').publish((data) => {
+    const channels = data.users.map(user => {
+      return app.channel(`userId/${user._id}`);
+    });
+
+    return channels;
+  });*/
 };
