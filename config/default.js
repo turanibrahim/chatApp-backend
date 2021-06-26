@@ -1,4 +1,6 @@
-{
+require('dotenv').config()
+
+module.exports = {
   "host": "localhost",
   "port": 3030,
   "public": "../public/",
@@ -9,7 +11,7 @@
   "authentication": {
     "entity": "user",
     "service": "users",
-    "secret": "V08qSuKdxM/ANmwSQ8n//or+No4=",
+    "secret": process.env.ENCRYPTION_SECRET,
     "authStrategies": [
       "jwt",
       "local"
@@ -28,5 +30,5 @@
       "passwordField": "password"
     }
   },
-  "mongodb": "mongodb+srv://admin:JH9giriw92O4I9Ob@cluster0.gomy8.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"
+  "mongodb": process.env.DATABASE_URL,
 }
